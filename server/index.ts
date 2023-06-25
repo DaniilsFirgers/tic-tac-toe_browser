@@ -77,6 +77,7 @@ wss.on("connection", (ws) => {
     ws.on("message", (data) => {
       const receivedData = data.toString();
       const parsedData = JSON.parse(receivedData);
+      console.log(parsedData);
 
       connectedClients.forEach((client: any) => {
         if (client.readyState === WebSocket.OPEN) {
@@ -85,7 +86,18 @@ wss.on("connection", (ws) => {
       });
     });
 
-    ws.on("close", () => {
+    ws.on("close", (data) => {
+      const closingObj = {
+        topic: "DISCONNECT",
+        msg: "One of the players",
+      };
+
+      connectedClients.forEach((client: any) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(closingObj));
+        }
+      });
+
       connectedClients = connectedClients.filter(
         (client: any) => client !== ws
       );

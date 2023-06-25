@@ -21,6 +21,13 @@
     firstMove: boolean;
   };
 
+  type disconnectMsg = {
+    topic: string;
+    msg: string;
+    shape: string;
+    player: string;
+  };
+
   let board: boardTile[] = [
     { id: 1, player: "", hit: false, topic: "GAME", shape: "" },
     { id: 2, player: "", hit: false, topic: "GAME", shape: "" },
@@ -34,7 +41,7 @@
   ];
 
   server.onmessage = (event) => {
-    const data: boardTile | connectMsg = JSON.parse(event.data);
+    const data: boardTile | connectMsg | disconnectMsg = JSON.parse(event.data);
 
     if (data.topic === "GAME") {
       const index = board.findIndex((obj) => obj.id === (data as boardTile).id);
@@ -54,7 +61,24 @@
       nextMove = (data as connectMsg).firstMove;
       console.log(nextMove);
     }
+
+    if (data.topic === "DISCONNECT") {
+      playerShape = data.shape;
+      const disconnectedPlayer = data as disconnectMsg;
+      console.log("Disconnected player ", disconnectedPlayer);
+    }
   };
+  server.onclose = () => {
+    const closeObject: disconnectMsg = {
+      msg: `Closing server for player ${playerName}`,
+      topic: "DISCONNECT",
+      shape: playerShape,
+      player: playerName,
+    };
+    const jsonCloseObj = JSON.stringify(closeObject);
+    server.send(jsonCloseObj);
+  };
+
   function submitPlayerChoice(tile: boardTile) {
     const updatedTile = {
       ...tile,
@@ -79,7 +103,7 @@
 
     combinations.forEach((combination) => {
       const res = checkObjectsAreTrueAndSameName(combination);
-      console.log("res", res);
+
       if (res) {
         console.log(`${playerName} won!`);
         console.log(board);
@@ -90,8 +114,9 @@
   function checkObjectsAreTrueAndSameName(ids) {
     const group = ids.map((id) => {
       const obj = board.find((item) => item.id === id);
-      return obj && obj.hit && obj.player;
+      return obj && obj.hit && obj.shape;
     });
+    console.log(group);
     if (group.every((item) => item)) {
       // Check if the player field is the same in all objects
       return group.every((item) => item === group[0]);
