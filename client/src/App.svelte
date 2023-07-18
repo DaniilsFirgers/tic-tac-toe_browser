@@ -1,12 +1,13 @@
 <script lang="ts">
   import { v4 as uuidv4 } from "uuid";
   const server = new WebSocket("ws://localhost:3006/game");
-
   const playerName = `Player ${uuidv4()}`;
   let playerShape = "";
-  let nextMove = false;
+  $: currentMove = false;
+  $: waitingForOtherPlayerToConnect = false;
+  $: gameIsOver = false;
 
-  type boardTile = {
+  type BoardTile = {
     id: number;
     player: string;
     hit: boolean;
@@ -14,21 +15,26 @@
     shape: string;
   };
 
-  type connectMsg = {
+  type ConnectMsg = {
     topic: string;
     msg: string;
     shape: string;
     firstMove: boolean;
   };
 
-  type disconnectMsg = {
+  type DisconnectMsg = {
     topic: string;
     msg: string;
     shape: string;
     player: string;
   };
 
-  let board: boardTile[] = [
+  type GameStartMsg = {
+    topic: string;
+    msg: string;
+  };
+
+  let board: BoardTile[] = [
     { id: 1, player: "", hit: false, topic: "GAME", shape: "" },
     { id: 2, player: "", hit: false, topic: "GAME", shape: "" },
     { id: 3, player: "", hit: false, topic: "GAME", shape: "" },
@@ -41,35 +47,39 @@
   ];
 
   server.onmessage = (event) => {
-    const data: boardTile | connectMsg | disconnectMsg = JSON.parse(event.data);
+    const data: BoardTile | ConnectMsg | DisconnectMsg = JSON.parse(event.data);
 
     if (data.topic === "GAME") {
-      const index = board.findIndex((obj) => obj.id === (data as boardTile).id);
+      const index = board.findIndex((obj) => obj.id === (data as BoardTile).id);
       if (index !== -1) {
-        board[index] = data as boardTile;
+        board[index] = data as BoardTile;
         checkGameBoard();
 
-        if ((data as boardTile).player === playerName) {
-          nextMove = false;
+        if ((data as BoardTile).player === playerName) {
+          currentMove = false;
         } else {
-          nextMove = true;
+          currentMove = true;
         }
       }
     }
-    if (data.topic === "CONNECT") {
+    if (data.topic == "CONNECT") {
       playerShape = data.shape;
-      nextMove = (data as connectMsg).firstMove;
-      console.log(nextMove);
+      currentMove = (data as ConnectMsg).firstMove;
+      waitingForOtherPlayerToConnect = currentMove;
     }
 
-    if (data.topic === "DISCONNECT") {
+    if (data.topic == "DISCONNECT") {
       playerShape = data.shape;
-      const disconnectedPlayer = data as disconnectMsg;
+      const disconnectedPlayer = data as DisconnectMsg;
       console.log("Disconnected player ", disconnectedPlayer);
+    }
+
+    if (data.topic == "GAME_START") {
+      waitingForOtherPlayerToConnect = false;
     }
   };
   server.onclose = () => {
-    const closeObject: disconnectMsg = {
+    const closeObject: DisconnectMsg = {
       msg: `Closing server for player ${playerName}`,
       topic: "DISCONNECT",
       shape: playerShape,
@@ -79,7 +89,7 @@
     server.send(jsonCloseObj);
   };
 
-  function submitPlayerChoice(tile: boardTile) {
+  function submitPlayerChoice(tile: BoardTile) {
     const updatedTile = {
       ...tile,
       player: playerName,
@@ -104,10 +114,7 @@
     combinations.forEach((combination) => {
       const res = checkObjectsAreTrueAndSameName(combination);
 
-      if (res) {
-        console.log(`${playerName} won!`);
-        console.log(board);
-      }
+      if (res) gameIsOver = true;
     });
   }
 
@@ -126,9 +133,20 @@
   }
 </script>
 
+{#if waitingForOtherPlayerToConnect}
+  <div>Wating for other player to connect....</div>
+{/if}
+{#if !waitingForOtherPlayerToConnect && !currentMove && !gameIsOver}
+  <div class="h-screen flex justify-center items-center">
+    Waiting for other player move...
+  </div>
+{/if}
 <main class="h-screen flex justify-center items-center">
   <div class="">
-    {#if nextMove}
+    {#if gameIsOver}
+      <div>Game over!</div>
+    {/if}
+    {#if currentMove && !gameIsOver}
       <div class="grid grid-cols-3 bg-red-500">
         {#each board as target}
           {#if target.hit === true}

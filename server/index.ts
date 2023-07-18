@@ -43,6 +43,17 @@ wss.on("connection", (ws) => {
     console.log("New client connected.");
 
     let chosenShape = "";
+    if (count == 2) {
+      const secondConnectMessage = {
+        topic: "GAME_START",
+        msg: "Two players connected",
+      };
+      connectedClients.forEach((client: any) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(secondConnectMessage));
+        }
+      });
+    }
 
     if (shapes.every((el) => el.taken === false)) {
       chosenShape = shapes[0].shape;
@@ -72,7 +83,6 @@ wss.on("connection", (ws) => {
 
       ws.send(JSON.stringify(infoMessage));
     }
-    console.log(shapes);
 
     ws.on("message", (data) => {
       const receivedData = data.toString();
