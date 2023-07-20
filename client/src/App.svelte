@@ -35,11 +35,8 @@
           return;
         }
 
-        if ((data as BoardTile).player == playerName) {
-          currentMove = false;
-        } else {
-          currentMove = true;
-        }
+        if ((data as BoardTile).player == playerName) currentMove = false;
+        else currentMove = true;
       }
     }
     if (data.topic == MessageType.CONNECT) {
